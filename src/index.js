@@ -44,6 +44,22 @@ export default {
 			case 'GET':
 				// 判断是目录请求还是文件请求
 				if (isDirectoryPath(key)) {
+
+					const prefix = key;
+					const options = {
+						prefix: prefix,
+						delimiter: '/',
+					};
+
+					const listing = await env.REPO_BUCKET.list(options);
+					const objects = listing.objects;
+
+					// 如果目录路径不存在，返回404
+					if (objects.length === 0 && listing.delimitedPrefixes.length === 0) {
+						return new Response("Not Found", { status: 404 });
+					}
+
+					// 如果不是API请求，返回HTML页面
 					if (!isApiRequest) {
 						const indexHtml = await env.ASSETS.fetch(request);
 						if (indexHtml === null) {
@@ -56,16 +72,8 @@ export default {
 							},
 						});
 					}
-					// API请求时返回JSON数据
-					// 处理目录请求
-					const prefix = key;
-					const options = {
-						prefix: prefix,
-						delimiter: '/',
-					};
 
-					const listing = await env.REPO_BUCKET.list(options);
-					const objects = listing.objects;
+					// API请求时返回JSON数据
 					const directories = listing.delimitedPrefixes
 						.map(prefix => ({
 							key: prefix,
