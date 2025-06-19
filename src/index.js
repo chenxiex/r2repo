@@ -47,7 +47,7 @@ export default {
 					if (!isApiRequest) {
 						const indexHtml = await env.ASSETS.fetch(request);
 						if (indexHtml === null) {
-							return new Response("index.html not found", { status: 404 });
+							return new Response("Not found", { status: 404 });
 						}
 
 						return new Response(indexHtml.body, {
@@ -101,16 +101,12 @@ export default {
 					const object = await env.REPO_BUCKET.get(key);
 
 					if (object === null) {
-						return new Response("Object Not Found", { status: 404 });
+						return new Response("Not Found", { status: 404 });
 					}
 
 					const headers = new Headers();
 					object.writeHttpMetadata(headers);
 					headers.set("etag", object.httpEtag);
-
-					// 设置Content-Disposition头使浏览器默认下载文件
-					const filename = key.split('/').pop();
-					headers.set("Content-Disposition", `inline; filename="${filename}"`);
 
 					return new Response(object.body, {
 						headers,
