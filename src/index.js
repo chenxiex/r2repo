@@ -89,7 +89,11 @@ export default {
 					return new Response(JSON.stringify({
 						path: '/' + key,
 						items: items,
-						parent: key === '' ? null : '/' + key.split('/').slice(0, -2).join('/') + '/'
+						parent: key === '' ? null : (
+							key.split('/').filter(Boolean).length <= 1
+								? '/'
+								: '/' + key.split('/').slice(0, -2).join('/') + '/'
+						)
 					}), {
 						headers: {
 							'Content-Type': 'application/json',
