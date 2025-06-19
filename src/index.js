@@ -45,7 +45,7 @@ export default {
 				// 判断是目录请求还是文件请求
 				if (isDirectoryPath(key)) {
 					if (!isApiRequest) {
-						const indexHtml = await env.ASSETS.get('index.html');
+						const indexHtml = await env.ASSETS.fetch(request);
 						if (indexHtml === null) {
 							return new Response("index.html not found", { status: 404 });
 						}
