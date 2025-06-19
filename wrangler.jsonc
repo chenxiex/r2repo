@@ -34,7 +34,6 @@
 		{
 			"binding": "REPO_BUCKET",
 			"bucket_name": "archrepo",
-			"preview_bucket_name": "archrepo-preview"
 		}
 	]
 
