@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Index of /</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 10px 20px;
+        }
+        h1 {
+            margin-bottom: 20px;
+        }
+        pre {
+            margin: 0;
+            white-space: pre-wrap;
+        }
+        a {
+            text-decoration: none;
+            color: blue;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <h1 id="directoryTitle">Index of /</h1>
+    <hr>
+    <pre id="content">Loading...</pre>
+    <hr>
+
+    <script>
+        // 格式化文件大小为固定宽度字符串
+        function formatSize(bytes) {
+            if (bytes === 0) return '0B'.padStart(8);
+            const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(1024));
+            const size = parseFloat((bytes / Math.pow(1024, i)).toFixed(1));
+            return (size + sizes[i]).padStart(8);
+        }
+        
+        // 格式化日期为固定宽度字符串
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            return date.toISOString().split('T')[0].padStart(12);
+        }
+        
+        // 获取并显示目录内容
+        async function fetchDirectory(path) {
+            // 如果路径不以/结尾，且不为空，则添加/
+            if (path !== '' && !path.endsWith('/')) {
+                path += '/';
+            }
+            
+            // 更新浏览器历史和URL
+            if (path !== window.location.pathname) {
+                history.pushState({path: path}, '', path);
+            }
+            
+            // 更新页面标题
+            const title = `Index of ${path}`;
+            document.title = title;
+            document.getElementById('directoryTitle').textContent = title;
+            
+            try {
+                // 获取目录数据
+                const response = await fetch(`/api${path}`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                // 构建纯文本样式的目录列表
+                let content = '';
+                
+                // 添加返回上级目录链接，除非已在根目录
+                if (data.parent !== null) {
+                    content += `<a href="${data.parent}">..</a>\n`;
+                }
+                
+                // 先显示目录
+                const directories = data.items.filter(item => item.isDirectory);
+                directories.forEach(item => {
+                    const name = item.name + '/';
+                    content += `<a href="/${item.key}">${name.padEnd(40)}</a>-\n`;
+                });
+                
+                // 再显示文件
+                const files = data.items.filter(item => !item.isDirectory);
+                files.forEach(item => {
+                    const sizeStr = formatSize(item.size);
+                    const dateStr = formatDate(item.uploaded);
+                    content += `<a href="/${item.key}">${item.name.padEnd(40)}</a>${sizeStr}  ${dateStr}\n`;
+                });
+                
+                // 更新页面内容
+                document.getElementById('content').innerHTML = content;
+                
+            } catch (error) {
+                document.getElementById('content').textContent = `Error: ${error.message}`;
+            }
+        }
+        
+        // 页面加载时获取当前路径的目录内容
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchDirectory(window.location.pathname);
+        });
+        
+        // 处理浏览器的前进/后退按钮
+        window.addEventListener('popstate', (event) => {
+            if (event.state && event.state.path) {
+                fetchDirectory(event.state.path);
+            } else {
+                fetchDirectory(window.location.pathname);
+            }
+        });
+        
+        // 初始化history状态
+        if (!history.state) {
+            history.replaceState({path: window.location.pathname}, '', window.location.pathname);
+        }
+    </script>
+</body>
+</html>
