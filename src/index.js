@@ -35,9 +35,6 @@ export default {
 		if (isApiRequest) {
 			key = key.replace(/^api\//, '');
 		}
-		if (isDirectoryPath(key) && !key.endsWith('/')) {
-			key += '/';
-		}
 
 		if (!authorizeRequest(request, env, key)) {
 			return new Response("Forbidden", { status: 403 });
