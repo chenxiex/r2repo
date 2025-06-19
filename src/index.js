@@ -65,9 +65,8 @@ export default {
 					};
 
 					const listing = await env.REPO_BUCKET.list(options);
-					const objects = listing.objects.filter(obj => !BLACK_LIST.includes(obj.key));
+					const objects = listing.objects;
 					const directories = listing.delimitedPrefixes
-						.filter(prefix => !BLACK_LIST.includes(prefix))
 						.map(prefix => ({
 							key: prefix,
 							name: prefix.split('/').slice(-2)[0] || prefix,
