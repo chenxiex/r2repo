@@ -236,7 +236,7 @@
             
             try {
                 // 获取目录数据
-                const response = await fetch(`/api${path}`);
+                const response = await fetch(`/r2repo_api${path}`);
                 
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);

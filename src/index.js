@@ -19,11 +19,11 @@ export default {
 		let key = url.pathname.slice(1);
 
 		// 检查是否为API请求
-		const isApiRequest = url.pathname.startsWith('/api/');
+		const isApiRequest = url.pathname.startsWith('/r2repo_api/');
 
 		// 如果是API请求，移除前缀
 		if (isApiRequest) {
-			key = key.replace(/^api\//, '');
+			key = key.replace(/^r2repo_api\//, '');
 		}
 
 		switch (request.method) {
