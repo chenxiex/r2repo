@@ -38,6 +38,11 @@ export default {
 						limit: 500,
 					};
 
+					const {success} = await env.BUCKET_LIST_RATE_LIMITER.limit({key: 'list'})
+					if (!success) {
+						return new Response("Too Many Requests", { status: 429 });
+					}
+
 					const listing = await env.REPO_BUCKET.list(options);
 					const objects = listing.objects;
 					let delimitedPrefixes = new Set(listing.delimitedPrefixes);
@@ -112,6 +117,11 @@ export default {
 					});
 				} else {
 					// 处理文件请求
+					const {success} = await env.BUCKET_GET_RATE_LIMITER.limit({key: 'get'})
+					if (!success) {
+						return new Response("Too Many Requests", { status: 429 });
+					}
+
 					const object = await env.REPO_BUCKET.get(key);
 
 					if (object === null) {
