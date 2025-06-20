@@ -32,6 +32,16 @@
     <hr>
 
     <script>
+        // HTML转义函数，防止XSS攻击
+        function escapeHTML(str) {
+            return str
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+        
         // 格式化文件大小为固定宽度字符串
         function formatSize(bytes) {
             if (bytes === 0) return '0B'.padStart(8);
@@ -59,8 +69,8 @@
                 history.pushState({path: path}, '', path);
             }
             
-            // 更新页面标题
-            const title = `Index of ${path}`;
+            // 更新页面标题 - 转义处理标题文本
+            const title = `Index of ${escapeHTML(path)}`;
             document.title = title;
             document.getElementById('directoryTitle').textContent = title;
             
@@ -79,29 +89,36 @@
                 
                 // 添加返回上级目录链接，除非已在根目录
                 if (data.parent !== null) {
-                    content += `<a href="${data.parent}">..</a>\n`;
+                    // 转义父目录路径
+                    const parentPath = escapeHTML(data.parent);
+                    content += `<a href="${parentPath}">..</a>\n`;
                 }
                 
                 // 先显示目录
                 const directories = data.items.filter(item => item.isDirectory);
                 directories.forEach(item => {
-                    const name = item.name + '/';
-                    content += `<a href="/${item.key}">${name.padEnd(40)}</a>-\n`;
+                    // 转义目录名称和路径
+                    const escapedName = escapeHTML(item.name) + '/';
+                    const escapedKey = escapeHTML(item.key);
+                    content += `<a href="/${escapedKey}">${escapedName.padEnd(40)}</a>-\n`;
                 });
                 
                 // 再显示文件
                 const files = data.items.filter(item => !item.isDirectory);
                 files.forEach(item => {
+                    // 转义文件名称和路径
+                    const escapedName = escapeHTML(item.name);
+                    const escapedKey = escapeHTML(item.key);
                     const sizeStr = formatSize(item.size);
                     const dateStr = formatDate(item.uploaded);
-                    content += `<a href="/${item.key}">${item.name.padEnd(40)}</a>${sizeStr}  ${dateStr}\n`;
+                    content += `<a href="/${escapedKey}">${escapedName.padEnd(40)}</a>${sizeStr}  ${dateStr}\n`;
                 });
                 
                 // 更新页面内容
                 document.getElementById('content').innerHTML = content;
                 
             } catch (error) {
-                document.getElementById('content').textContent = `Error: ${error.message}`;
+                document.getElementById('content').textContent = `Error: ${escapeHTML(error.message)}`;
             }
         }
         
