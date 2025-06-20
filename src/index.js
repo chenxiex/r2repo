@@ -35,13 +35,15 @@ export default {
 					const options = {
 						prefix: prefix,
 						delimiter: '/',
+						limit: 500,
 					};
 
 					const listing = await env.REPO_BUCKET.list(options);
 					const objects = listing.objects;
+					let delimitedPrefixes = new Set(listing.delimitedPrefixes);
 
 					// 如果目录路径不存在，返回404
-					if (objects.length === 0 && listing.delimitedPrefixes.length === 0) {
+					if (objects.length === 0 && delimitedPrefixes.size === 0) {
 						return new Response("Not Found", { status: 404 });
 					}
 
@@ -59,8 +61,23 @@ export default {
 						});
 					}
 
+					let truncated = listing.truncated;
+					let cursor = truncated ? listing.cursor : undefined;
+
+					while (truncated) {
+						const next = await env.REPO_BUCKET.list({
+							...options,
+							cursor: cursor,
+						});
+						objects.push(...next.objects);
+						next.delimitedPrefixes.forEach(prefix => delimitedPrefixes.add(prefix));
+
+						truncated = next.truncated;
+						cursor = next.cursor;
+					}
+
 					// API请求时返回JSON数据
-					const directories = listing.delimitedPrefixes
+					const directories = Array.from(delimitedPrefixes)
 						.map(prefix => ({
 							key: prefix,
 							name: prefix.split('/').slice(-2)[0] || prefix,
