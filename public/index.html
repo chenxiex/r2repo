@@ -23,15 +23,56 @@
         a:hover {
             text-decoration: underline;
         }
+        .loading {
+            display: inline-block;
+            animation: spin 1s infinite linear;
+        }
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        .file-item {
+            display: flex;
+            line-height: 1.5;
+        }
+        .file-name {
+            flex: 0 0 40ch;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .file-size {
+            flex: 0 0 8ch;
+            text-align: right;
+            padding-right: 2ch;
+        }
+        .file-date {
+            flex: 0 0 12ch;
+        }
+        .pagination {
+            margin-top: 10px;
+        }
+        .pagination button {
+            margin-right: 5px;
+        }
     </style>
 </head>
 <body>
     <h1 id="directoryTitle">Index of /</h1>
     <hr>
-    <pre id="content">Loading...</pre>
+    <div id="content">
+        <div class="loading">⟳</div> Loading...
+    </div>
+    <div id="pagination" class="pagination"></div>
     <hr>
 
     <script>
+        // 配置参数
+        const PAGE_SIZE = 100; // 每页显示的条目数
+        let currentPage = 0;
+        let allItems = [];
+        let currentPath = '';
+        
         // HTML转义函数，防止XSS攻击
         function escapeHTML(str) {
             return str
@@ -44,17 +85,129 @@
         
         // 格式化文件大小为固定宽度字符串
         function formatSize(bytes) {
-            if (bytes === 0) return '0B'.padStart(8);
+            if (bytes === 0) return '0B';
             const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
             const i = Math.floor(Math.log(bytes) / Math.log(1024));
             const size = parseFloat((bytes / Math.pow(1024, i)).toFixed(1));
-            return (size + sizes[i]).padStart(8);
+            return size + sizes[i];
         }
         
         // 格式化日期为固定宽度字符串
         function formatDate(dateString) {
             const date = new Date(dateString);
-            return date.toISOString().split('T')[0].padStart(12);
+            return date.toISOString().split('T')[0];
+        }
+        
+        // 创建文件/文件夹元素
+        function createItemElement(item, isParent = false) {
+            const div = document.createElement('div');
+            div.className = 'file-item';
+            
+            const nameSpan = document.createElement('span');
+            nameSpan.className = 'file-name';
+            
+            const link = document.createElement('a');
+            if (isParent) {
+                link.textContent = '..';
+                link.href = escapeHTML(item);
+            } else {
+                const name = escapeHTML(item.name) + (item.isDirectory ? '/' : '');
+                link.textContent = name;
+                link.href = '/' + escapeHTML(item.key);
+                
+                if (!item.isDirectory) {
+                    // 添加文件大小和日期
+                    const sizeSpan = document.createElement('span');
+                    sizeSpan.className = 'file-size';
+                    sizeSpan.textContent = formatSize(item.size);
+                    div.appendChild(sizeSpan);
+                    
+                    const dateSpan = document.createElement('span');
+                    dateSpan.className = 'file-date';
+                    dateSpan.textContent = formatDate(item.uploaded);
+                    div.appendChild(dateSpan);
+                } else {
+                    // 目录只显示一个占位符
+                    const sizeSpan = document.createElement('span');
+                    sizeSpan.className = 'file-size';
+                    sizeSpan.textContent = '-';
+                    div.appendChild(sizeSpan);
+                }
+            }
+            
+            nameSpan.appendChild(link);
+            div.appendChild(nameSpan);
+            return div;
+        }
+        
+        // 渲染页面内容
+        function renderPage(page) {
+            const contentDiv = document.getElementById('content');
+            contentDiv.innerHTML = '';
+            
+            const startIndex = page * PAGE_SIZE;
+            const endIndex = Math.min(startIndex + PAGE_SIZE, allItems.length);
+            
+            const fragment = document.createDocumentFragment();
+            
+            // 添加返回上级目录链接，只在第一页显示
+            if (page === 0 && allItems.parentPath) {
+                fragment.appendChild(createItemElement(allItems.parentPath, true));
+            }
+            
+            // 添加当前页的文件和目录
+            for (let i = startIndex; i < endIndex; i++) {
+                fragment.appendChild(createItemElement(allItems[i]));
+            }
+            
+            contentDiv.appendChild(fragment);
+            updatePagination();
+        }
+        
+        // 更新分页控件
+        function updatePagination() {
+            const paginationDiv = document.getElementById('pagination');
+            paginationDiv.innerHTML = '';
+            
+            // 如果条目数少于页大小，不需要分页
+            if (allItems.length <= PAGE_SIZE) {
+                return;
+            }
+            
+            const totalPages = Math.ceil(allItems.length / PAGE_SIZE);
+            
+            const fragment = document.createDocumentFragment();
+            
+            // 上一页按钮
+            const prevButton = document.createElement('button');
+            prevButton.textContent = '上一页';
+            prevButton.disabled = currentPage === 0;
+            prevButton.addEventListener('click', () => {
+                if (currentPage > 0) {
+                    currentPage--;
+                    renderPage(currentPage);
+                }
+            });
+            fragment.appendChild(prevButton);
+            
+            // 页码指示器
+            const pageInfo = document.createElement('span');
+            pageInfo.textContent = ` 第 ${currentPage + 1}/${totalPages} 页 `;
+            fragment.appendChild(pageInfo);
+            
+            // 下一页按钮
+            const nextButton = document.createElement('button');
+            nextButton.textContent = '下一页';
+            nextButton.disabled = currentPage >= totalPages - 1;
+            nextButton.addEventListener('click', () => {
+                if (currentPage < totalPages - 1) {
+                    currentPage++;
+                    renderPage(currentPage);
+                }
+            });
+            fragment.appendChild(nextButton);
+            
+            paginationDiv.appendChild(fragment);
         }
         
         // 获取并显示目录内容
@@ -64,15 +217,22 @@
                 path += '/';
             }
             
+            currentPath = path;
+            currentPage = 0; // 重置页码
+            
             // 更新浏览器历史和URL
             if (path !== window.location.pathname) {
                 history.pushState({path: path}, '', path);
             }
             
-            // 更新页面标题 - 转义处理标题文本
+            // 更新页面标题
             const title = `Index of ${escapeHTML(path)}`;
             document.title = title;
             document.getElementById('directoryTitle').textContent = title;
+            
+            // 显示加载状态
+            document.getElementById('content').innerHTML = '<div class="loading">⟳</div> Loading...';
+            document.getElementById('pagination').innerHTML = '';
             
             try {
                 // 获取目录数据
@@ -84,41 +244,22 @@
                 
                 const data = await response.json();
                 
-                // 构建纯文本样式的目录列表
-                let content = '';
-                
-                // 添加返回上级目录链接，除非已在根目录
-                if (data.parent !== null) {
-                    // 转义父目录路径
-                    const parentPath = escapeHTML(data.parent);
-                    content += `<a href="${parentPath}">..</a>\n`;
-                }
-                
-                // 先显示目录
+                // 先处理目录，再处理文件
                 const directories = data.items.filter(item => item.isDirectory);
-                directories.forEach(item => {
-                    // 转义目录名称和路径
-                    const escapedName = escapeHTML(item.name) + '/';
-                    const escapedKey = escapeHTML(item.key);
-                    content += `<a href="/${escapedKey}">${escapedName.padEnd(40)}</a>-\n`;
-                });
-                
-                // 再显示文件
                 const files = data.items.filter(item => !item.isDirectory);
-                files.forEach(item => {
-                    // 转义文件名称和路径
-                    const escapedName = escapeHTML(item.name);
-                    const escapedKey = escapeHTML(item.key);
-                    const sizeStr = formatSize(item.size);
-                    const dateStr = formatDate(item.uploaded);
-                    content += `<a href="/${escapedKey}">${escapedName.padEnd(40)}</a>${sizeStr}  ${dateStr}\n`;
-                });
                 
-                // 更新页面内容
-                document.getElementById('content').innerHTML = content;
+                // 合并排序后的结果
+                allItems = [...directories, ...files];
+                
+                // 保存父目录路径
+                allItems.parentPath = data.parent;
+                
+                // 渲染第一页
+                renderPage(0);
                 
             } catch (error) {
                 document.getElementById('content').textContent = `Error: ${escapeHTML(error.message)}`;
+                document.getElementById('pagination').innerHTML = '';
             }
         }
         
