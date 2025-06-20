@@ -7,16 +7,6 @@
  *
  * Learn more at https://developers.cloudflare.com/workers/
  */
-const BLACK_LIST = []
-
-function authorizeRequest(request, env, key) {
-	switch (request.method) {
-		case "GET":
-			return BLACK_LIST.includes(key) ? false : true;
-		default:
-			return false;
-	}
-}
 
 // 判断是否为目录
 function isDirectoryPath(path) {
@@ -34,10 +24,6 @@ export default {
 		// 如果是API请求，移除前缀
 		if (isApiRequest) {
 			key = key.replace(/^api\//, '');
-		}
-
-		if (!authorizeRequest(request, env, key)) {
-			return new Response("Forbidden", { status: 403 });
 		}
 
 		switch (request.method) {
