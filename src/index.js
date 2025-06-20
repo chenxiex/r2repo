@@ -54,7 +54,7 @@ export default {
 
 					// 如果不是API请求，返回HTML页面
 					if (!isApiRequest) {
-						const indexHtml = await env.ASSETS.fetch(request);
+						const indexHtml = await env.ASSETS.fetch(new URL('/index.html', 'https://assets.local'));
 						if (indexHtml === null) {
 							return new Response("Not found", { status: 404 });
 						}
