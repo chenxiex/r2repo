@@ -13,6 +13,22 @@ function isDirectoryPath(path) {
 	return path === '' || path.endsWith('/');
 }
 
+function safeBucketList(env, options) {
+	const { success } = env.BUCKET_A_RATE_LIMITER.limit({ key: 'A' })
+	if (!success) {
+		return Promise.reject(new Error("Too Many Requests"));
+	}
+	return env.REPO_BUCKET.list(options);
+}
+
+function safeBucketGet(env, key) {
+	const { success } = env.BUCKET_B_RATE_LIMITER.limit({ key: 'B' })
+	if (!success) {
+		return Promise.reject(new Error("Too Many Requests"));
+	}
+	return env.REPO_BUCKET.get(key);
+}
+
 export default {
 	async fetch(request, env, ctx) {
 		const url = new URL(request.url);
@@ -33,12 +49,11 @@ export default {
 						limit: 500,
 					};
 
-					const {success} = await env.BUCKET_LIST_RATE_LIMITER.limit({key: 'list'})
-					if (!success) {
-						return new Response("Too Many Requests", { status: 429 });
-					}
-
-					const listing = await env.REPO_BUCKET.list(options);
+					const listing = await safeBucketList(env, options).catch(err => {
+						if (err.message === "Too Many Requests") {
+							return new Response("Too Many Requests", { status: 429 });
+						}
+					});
 					const objects = listing.objects;
 					let delimitedPrefixes = new Set(listing.delimitedPrefixes);
 
@@ -65,9 +80,13 @@ export default {
 					let cursor = truncated ? listing.cursor : undefined;
 
 					while (truncated) {
-						const next = await env.REPO_BUCKET.list({
+						const next = await safeBucketList(env, {
 							...options,
 							cursor: cursor,
+						}).catch(err => {
+							if (err.message === "Too Many Requests") {
+								return new Response("Too Many Requests", { status: 429 });
+							}
 						});
 						objects.push(...next.objects);
 						next.delimitedPrefixes.forEach(prefix => delimitedPrefixes.add(prefix));
@@ -112,12 +131,11 @@ export default {
 					});
 				} else {
 					// 处理文件请求
-					const {success} = await env.BUCKET_GET_RATE_LIMITER.limit({key: 'get'})
-					if (!success) {
-						return new Response("Too Many Requests", { status: 429 });
-					}
-
-					const object = await env.REPO_BUCKET.get(key);
+					const object = await safeBucketGet(env, key).catch(err => {
+						if (err.message === "Too Many Requests") {
+							return new Response("Too Many Requests", { status: 429 });
+						}
+					});
 
 					if (object === null) {
 						return new Response("Not Found", { status: 404 });
