@@ -13,6 +13,20 @@ function isDirectoryPath(path) {
 	return path === '' || path.endsWith('/');
 }
 
+async function preListCheck(env) {
+	const { success } = await env.BUCKET_A_RATE_LIMITER.limit({ key: 'A' })
+	if (!success) {
+		return new Response("Too Many Requests", { status: 429 });
+	}
+}
+
+async function preGetCheck(env) {
+	const { success } = await env.BUCKET_B_RATE_LIMITER.limit({ key: 'B' })
+	if (!success) {
+		return new Response("Too Many Requests", { status: 429 });
+	}
+}
+
 export default {
 	async fetch(request, env, ctx) {
 		const url = new URL(request.url);
@@ -33,9 +47,9 @@ export default {
 						limit: 500,
 					};
 
-					const { success } = await env.BUCKET_A_RATE_LIMITER.limit({ key: 'A' })
-					if (!success) {
-						return new Response("Too Many Requests", { status: 429 });
+					const listCheckResp = await preListCheck(env);
+					if (listCheckResp) {
+						return listCheckResp;
 					}
 					const listing = await env.REPO_BUCKET.list(options);
 					const objects = listing.objects;
@@ -64,9 +78,9 @@ export default {
 					let cursor = truncated ? listing.cursor : undefined;
 
 					while (truncated) {
-						const { success } = await env.BUCKET_A_RATE_LIMITER.limit({ key: 'A' })
-						if (!success) {
-							return new Response("Too Many Requests", { status: 429 });
+						const listCheckResp = await preListCheck(env);
+						if (listCheckResp) {
+							return listCheckResp;
 						}
 						const next = await env.REPO_BUCKET.list({
 							...options,
@@ -115,9 +129,9 @@ export default {
 					});
 				} else {
 					// 处理文件请求
-					const { success } = await env.BUCKET_B_RATE_LIMITER.limit({ key: 'B' })
-					if (!success) {
-						return new Response("Too Many Requests", { status: 429 });
+					const getCheckResp = await preGetCheck(env);
+					if (getCheckResp) {
+						return getCheckResp;
 					}
 					const object = await env.REPO_BUCKET.get(key);
 
