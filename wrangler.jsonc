@@ -39,7 +39,7 @@
 	"unsafe": {
 		"bindings": [
 			{
-				"name": "BUCKET_A_RATE_LIMITER",
+				"name": "BUCKET_LIST_RATE_LIMITER",
 				"type": "ratelimit",
 				"namespace_id": "1001",
 				"simple": {
@@ -48,7 +48,7 @@
 				}
 			},
 			{
-				"name": "BUCKET_B_RATE_LIMITER",
+				"name": "BUCKET_GET_RATE_LIMITER",
 				"type": "ratelimit",
 				"namespace_id": "1002",
 				"simple": {
