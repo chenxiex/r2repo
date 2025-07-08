@@ -133,7 +133,54 @@ export default {
 					if (getCheckResp) {
 						return getCheckResp;
 					}
-					const object = await env.REPO_BUCKET.get(key);
+
+					// 首先获取文件的元数据来确定文件大小
+					const objectHead = await env.REPO_BUCKET.head(key);
+					if (objectHead === null) {
+						return new Response("Not Found", { status: 404 });
+					}
+
+					const fileSize = objectHead.size;
+					const rangeHeader = request.headers.get('range');
+					
+					let object;
+					let start = 0;
+					let end = fileSize - 1;
+					let isRangeRequest = false;
+
+					// 处理 Range 请求
+					if (rangeHeader) {
+						const rangeMatch = rangeHeader.match(/bytes=(\d*)-(\d*)/);
+						if (rangeMatch) {
+							isRangeRequest = true;
+							const rangeStart = rangeMatch[1] ? parseInt(rangeMatch[1]) : 0;
+							const rangeEnd = rangeMatch[2] ? parseInt(rangeMatch[2]) : fileSize - 1;
+							
+							// 验证范围的有效性
+							if (rangeStart >= fileSize || rangeEnd >= fileSize || rangeStart > rangeEnd) {
+								return new Response("Requested Range Not Satisfiable", { 
+									status: 416,
+									headers: {
+										'Content-Range': `bytes */${fileSize}`
+									}
+								});
+							}
+							
+							start = rangeStart;
+							end = rangeEnd;
+							
+							// 使用 range 参数获取指定范围的数据
+							object = await env.REPO_BUCKET.get(key, {
+								range: { offset: start, length: end - start + 1 }
+							});
+						} else {
+							// 无效的 Range 格式，返回完整文件
+							object = await env.REPO_BUCKET.get(key);
+						}
+					} else {
+						// 没有 Range 请求，返回完整文件
+						object = await env.REPO_BUCKET.get(key);
+					}
 
 					if (object === null) {
 						return new Response("Not Found", { status: 404 });
@@ -141,11 +188,26 @@ export default {
 
 					const headers = new Headers();
 					object.writeHttpMetadata(headers);
-					headers.set("etag", object.httpEtag);
+					headers.set("etag", objectHead.httpEtag);
+					headers.set("accept-ranges", "bytes");
 
-					return new Response(object.body, {
-						headers,
-					});
+					if (isRangeRequest) {
+						// 设置 206 状态码和相关头部
+						headers.set("content-range", `bytes ${start}-${end}/${fileSize}`);
+						headers.set("content-length", (end - start + 1).toString());
+						
+						return new Response(object.body, {
+							status: 206,
+							headers,
+						});
+					} else {
+						// 完整文件响应
+						headers.set("content-length", fileSize.toString());
+						
+						return new Response(object.body, {
+							headers,
+						});
+					}
 				}
 			default:
 				return new Response("Method Not Allowed", {
